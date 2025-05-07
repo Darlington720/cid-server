@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { PRIVATE_KEY } from "../config/config.js";
 import { getUserLastLoginDetails } from "../helpers/users.js";
 
+const AUTH_TIMEOUT = 5000; // 5 seconds timeout for auth operations
 
 const auth = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -11,38 +12,53 @@ const auth = async (req, res, next) => {
     return res.status(401).send({
       success: false,
       message: "Access denied. No token provided.",
-    })
+    });
   }
 
-
-  try {
-    const decoded = jwt.verify(token, PRIVATE_KEY);
-   
-    // Continue with further checks if the token is verified
-  const lastLogin = await getUserLastLoginDetails({
-    user_id: decoded.id,
-    lastRecord: true,
+  // Create a timeout promise
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Authentication timeout'));
+    }, AUTH_TIMEOUT);
   });
 
-  console.log('lastLogin', lastLogin)
-  console.log('decoded', decoded)
+  try {
+    // Race between auth operations and timeout
+    const decoded = await Promise.race([
+      jwt.verify(token, PRIVATE_KEY),
+      timeoutPromise
+    ]);
 
-  if (!lastLogin || lastLogin.session_id !== decoded.session_id) {
-    return res.status(401).send({
-      success: false,
-      message: "Invalid token.",
-    })
-  }
+    const lastLogin = await Promise.race([
+      getUserLastLoginDetails({
+        user_id: decoded.id,
+        lastRecord: true,
+      }),
+      timeoutPromise
+    ]);
 
-  // Set the user on the request if authentication is successful
-  req.user = decoded;
-  next();
+    if (!lastLogin || lastLogin.session_id !== decoded.session_id) {
+      return res.status(401).send({
+        success: false,
+        message: "Invalid token.",
+      });
+    }
+
+    // Set the user on the request if authentication is successful
+    req.user = decoded;
+    next();
   } catch (error) {
-    console.log("error", error)
+    if (error.message === 'Authentication timeout') {
+      return res.status(408).send({
+        success: false,
+        message: "Authentication request timed out.",
+      });
+    }
+
     return res.status(401).send({
       success: false,
       message: "Invalid token.",
-    })
+    });
   }
 };
 export default auth;

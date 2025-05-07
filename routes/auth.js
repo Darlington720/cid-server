@@ -26,6 +26,7 @@ router.post('/login', async (req, res) => {
     res.header('x-auth-token', `Bearer ${result.token}`);
     res.json(result);
   } catch (error) {
+    // console.error('Login error:', error);
     res.status(401).json({error: error.message});
   }
 });

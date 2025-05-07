@@ -252,6 +252,7 @@ export const loginUser = async ({ email, password, user_id, ip_address }) => {
     };
 
   } catch (error) {
+    // console.log('error_', error)
     throw {
       success: false,
       message: error.message || "Login failed",

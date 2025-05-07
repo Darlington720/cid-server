@@ -13,6 +13,8 @@ const db = await mysql.createPool({
   connectionLimit: 10,
   waitForConnections: true,
   enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  queueLimit: 0,
 });
 
 export { port, db, baseUrl, PRIVATE_KEY };

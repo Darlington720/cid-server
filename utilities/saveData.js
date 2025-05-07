@@ -34,6 +34,7 @@ import { db } from "../config/config.js";
 
 const saveData = async ({ table, id, data, idColumn = "id", connection }) => {
   const conn = connection || (await db.getConnection());
+  let acquiredConnection = !connection;
   try {
     // Handle array case separately
     if (Array.isArray(data)) {
@@ -46,7 +47,6 @@ const saveData = async ({ table, id, data, idColumn = "id", connection }) => {
 
       const promises = data.map((row) => {
         let values = Object.values(row);
-        console.log("row", row);
         return conn.execute(sql, values);
       });
 
@@ -91,6 +91,10 @@ const saveData = async ({ table, id, data, idColumn = "id", connection }) => {
     }
   } catch (error) {
     throw new Error(error.message);
+  } finally {
+    if (acquiredConnection && conn) {
+      conn.release();
+    }
   }
 };
 
